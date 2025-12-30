@@ -10,10 +10,11 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 // ---- Firebase Admin ----
-const serviceAccount = require("./serviceAccountKey.json"); // keep this out of git
-
+// Service account JSON comes from env: FIREBASE_SERVICE_ACCOUNT_JSON
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert(
+    JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
+  ),
 });
 
 const db = admin.firestore();
@@ -44,17 +45,25 @@ app.post("/whatsapp/webhook", async (req, res) => {
 
     if (newState === null) {
       console.log("Unknown command from", from, "body:", body);
+      // You can optionally send a Twilio reply here later
     } else {
       await db.doc("doors/mainDoor").set(
         {
           isOpen: newState,
           lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-          source: "whatsapp-local-test",
+          source: "whatsapp",
           from,
         },
         { merge: true }
       );
       console.log("Updated Firestore isOpen to", newState);
+
+      // Optional Twilio confirmation reply (uncomment after Twilio is fully set):
+      // await twilioClient.messages.create({
+      //   from: WHATSAPP_NUMBER,
+      //   to: from,
+      //   body: newState ? "Door opened ✅" : "Door closed 🔒",
+      // });
     }
 
     res.status(200).send("ok");
@@ -63,7 +72,6 @@ app.post("/whatsapp/webhook", async (req, res) => {
     res.status(500).send("error");
   }
 });
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
