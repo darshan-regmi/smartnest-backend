@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <title>SmartNest · Door Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Feather Icons CDN -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/feather-icons/dist/feather-sprite.css"
+  />
+
   <style>
     :root {
       --bg: #020617;
@@ -17,6 +24,8 @@
       --border: #1f2937;
       --danger: #ef4444;
       --danger-soft: rgba(239,68,68,0.12);
+      --shadow-strong: rgba(15,23,42,0.5);
+      --shadow-soft: rgba(15,23,42,0.3);
     }
 
     @media (prefers-color-scheme: light) {
@@ -32,10 +41,14 @@
         --border: #e5e7eb;
         --danger: #dc2626;
         --danger-soft: rgba(220,38,38,0.06);
+        --shadow-strong: rgba(15,23,42,0.16);
+        --shadow-soft: rgba(15,23,42,0.08);
       }
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -71,15 +84,20 @@
     }
 
     .brand-mark {
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       border-radius: 10px;
       background: radial-gradient(circle at 30% 0, #22c55e, #16a34a 45%, #14532d 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
       color: #f9fafb;
+      box-shadow: 0 8px 20px var(--shadow-strong);
+    }
+
+    .brand-mark svg {
+      width: 18px;
+      height: 18px;
     }
 
     .brand-text {
@@ -154,8 +172,7 @@
       background: linear-gradient(145deg, var(--card), var(--card-alt));
       border-radius: 18px;
       border: 1px solid var(--border);
-      box-shadow:
-        0 16px 30px rgba(15,23,42,0.4);
+      box-shadow: 0 14px 26px var(--shadow-strong);
       padding: 16px 16px 14px;
     }
 
@@ -199,6 +216,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: 0 10px 22px var(--shadow-soft);
     }
 
     @media (prefers-color-scheme: light) {
@@ -207,8 +225,10 @@
       }
     }
 
-    .door-icon {
-      font-size: 24px;
+    .door-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke-width: 1.9;
     }
 
     .door-copy {
@@ -272,8 +292,10 @@
       }
     }
 
-    .btn span.icon {
-      font-size: 14px;
+    .btn svg {
+      width: 14px;
+      height: 14px;
+      stroke-width: 2;
     }
 
     .btn-primary {
@@ -327,9 +349,15 @@
     }
 
     @media (max-width: 480px) {
-      body { padding: 14px; }
-      .card { padding: 14px 14px 12px; }
-      .controls { grid-template-columns: minmax(0, 1fr); }
+      body {
+        padding: 14px;
+      }
+      .card {
+        padding: 14px 14px 12px;
+      }
+      .controls {
+        grid-template-columns: minmax(0, 1fr);
+      }
     }
   </style>
 </head>
@@ -337,14 +365,20 @@
   <div class="page">
     <header>
       <div class="brand">
-        <div class="brand-mark">SN</div>
+        <div class="brand-mark" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M9 12l2 2 4-4"></path>
+          </svg>
+        </div>
         <div class="brand-text">
           <div class="brand-name">SmartNest</div>
           <div class="brand-sub">Secure door control, in real time.</div>
         </div>
       </div>
       <div class="header-right">
-        <div class="status-chip">
+        <div class="status-chip" aria-live="polite">
           <span class="status-dot" id="online-dot"></span>
           <span id="online-text">CHECKING</span>
         </div>
@@ -358,13 +392,20 @@
         <div class="card-header">
           <div class="card-title">Main door</div>
           <div class="card-subtitle">
-            Tap to open or close. State is synced to the ESP32 lock and mobile app.
+            Tap to open or close. State is synced with the ESP32 lock and mobile app.
           </div>
         </div>
 
         <div class="door-card">
           <div class="door-icon-wrap">
-            <div class="door-icon" id="door-icon">🔒</div>
+            <div class="door-icon" id="door-icon" aria-hidden="true">
+              <!-- locked icon by default -->
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor">
+                <rect x="3" y="11" width="18" height="10" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
           </div>
           <div class="door-copy">
             <div class="door-label">Entry door</div>
@@ -376,13 +417,19 @@
           Loading state from server…
         </div>
 
-        <div class="controls">
-          <button class="btn btn-primary" id="btn-open">
-            <span class="icon">●</span>
+        <div class="controls" aria-label="Door controls">
+          <button class="btn btn-primary" id="btn-open" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="4"></circle>
+            </svg>
             <span>Open</span>
           </button>
-          <button class="btn btn-danger" id="btn-close">
-            <span class="icon">○</span>
+          <button class="btn btn-danger" id="btn-close" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="7"></circle>
+            </svg>
             <span>Close</span>
           </button>
         </div>
@@ -427,33 +474,47 @@
 
     let isLoading = false;
 
-    function setLoading(loading) {
-      isLoading = loading;
-      btnOpen.disabled = loading;
-      btnClose.disabled = loading;
-      if (loading) doorMetaEl.textContent = "Syncing with door…";
-    }
-
-    function updateVisual(open) {
-      if (open) {
-        doorStateEl.textContent = "Open";
-        doorIconEl.textContent = "🔓";
-      } else {
-        doorStateEl.textContent = "Closed";
-        doorIconEl.textContent = "🔒";
+    function setLoading(isBusy) {
+      isLoading = isBusy;
+      btnOpen.disabled = isBusy;
+      btnClose.disabled = isBusy;
+      if (isBusy) {
+        doorMetaEl.textContent = "Syncing with door…";
       }
     }
 
-    function formatDate(d) {
-      if (!d) return "—";
-      const dt = new Date(d);
-      return dt.toLocaleString();
+    function setDoorIcon(isOpen) {
+      const svgOpen = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor">
+          <rect x="3" y="11" width="18" height="10" rx="2" ry="2"></rect>
+          <path d="M17 11V9a5 5 0 0 0-9.9-1"></path>
+        </svg>`;
+      const svgClosed = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor">
+          <rect x="3" y="11" width="18" height="10" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>`;
+      doorIconEl.innerHTML = isOpen ? svgOpen : svgClosed;
+    }
+
+    function updateVisual(isOpen) {
+      doorStateEl.textContent = isOpen ? "Open" : "Closed";
+      setDoorIcon(isOpen);
+    }
+
+    function formatDate(value) {
+      if (!value) return "—";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "—";
+      return date.toLocaleString();
     }
 
     async function loadInitialState() {
       try {
         const res = await fetch("/door-state");
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error("Bad status: " + res.status);
         const data = await res.json();
 
         if (!data.exists) {
@@ -472,19 +533,20 @@
         activityStateEl.textContent = data.isOpen ? "Open" : "Closed";
         activityTimeEl.textContent = formatDate(data.lastUpdated);
         activitySourceEl.textContent = data.source || "Unknown";
-      } catch (e) {
-        console.error(e);
+      } catch (error) {
+        console.error(error);
         doorMetaEl.textContent = "Failed to load state from server.";
       }
     }
 
-    async function setDoorState(open) {
+    async function setDoorState(isOpen) {
       if (isLoading) return;
       setLoading(true);
+
       try {
         const body = new URLSearchParams();
         body.append("From", "web-ui");
-        body.append("Body", open ? "open" : "close");
+        body.append("Body", isOpen ? "open" : "close");
 
         const res = await fetch("/whatsapp/webhook", {
           method: "POST",
@@ -492,17 +554,17 @@
           body,
         });
 
-        if (!res.ok) throw new Error("Status " + res.status);
+        if (!res.ok) throw new Error("Bad status: " + res.status);
 
-        updateVisual(open);
+        updateVisual(isOpen);
         const now = new Date();
-        const nowStr = now.toLocaleString();
+        const stamp = now.toLocaleString();
         doorMetaEl.textContent = "Door state updated.";
-        activityStateEl.textContent = open ? "Open" : "Closed";
-        activityTimeEl.textContent = nowStr;
+        activityStateEl.textContent = isOpen ? "Open" : "Closed";
+        activityTimeEl.textContent = stamp;
         activitySourceEl.textContent = "web-ui";
-      } catch (e) {
-        console.error(e);
+      } catch (error) {
+        console.error(error);
         doorMetaEl.textContent = "Failed to update state. Check backend.";
       } finally {
         setLoading(false);
@@ -510,6 +572,7 @@
     }
 
     (async () => {
+      // health indicator
       try {
         const res = await fetch("/health");
         if (!res.ok) throw new Error();
