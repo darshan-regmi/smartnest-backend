@@ -67,8 +67,10 @@ app.get("/door-state", async (req, res) => {
   }
 });
 
-// Twilio webhook + web UI command endpoint
+// Twilio WhatsApp webhook
 app.post("/whatsapp/webhook", async (req, res) => {
+  console.log("Incoming body:", req.body);
+
   const from = (req.body.From || "").toString().trim();
   const body = (req.body.Body || "").toString().trim().toLowerCase();
 
@@ -80,6 +82,8 @@ app.post("/whatsapp/webhook", async (req, res) => {
 
     if (newState === null) {
       console.log("Unknown command from", from, "body:", body);
+
+      // Optional help reply
       if (twilioClient && from.startsWith("whatsapp:")) {
         await twilioClient.messages.create({
           from: WHATSAPP_NUMBER,
@@ -99,11 +103,14 @@ app.post("/whatsapp/webhook", async (req, res) => {
       );
       console.log("Updated Firestore isOpen to", newState);
 
+      // Confirmation reply back to WhatsApp only
       if (twilioClient && from.startsWith("whatsapp:")) {
         await twilioClient.messages.create({
           from: WHATSAPP_NUMBER,
           to: from,
-          body: newState ? "Door opened" : "Door closed",
+          body: newState
+            ? "The door is now open."
+            : "The door is now closed.",
         });
       }
     }
@@ -114,6 +121,7 @@ app.post("/whatsapp/webhook", async (req, res) => {
     res.status(500).send("error");
   }
 });
+
 
 // 404 for unknown API routes
 app.use((req, res) => {
