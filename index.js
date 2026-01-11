@@ -67,44 +67,43 @@ app.get("/door-state", async (req, res) => {
   }
 });
 
-// Twilio WhatsApp webhook - FIXED VERSION
+// Twilio WhatsApp webhook
 app.post("/whatsapp/webhook", async (req, res) => {
   console.log("Incoming body:", req.body);
 
   const rawFrom = req.body.From;
   console.log("Raw From:", JSON.stringify(rawFrom));
 
-  const from = (rawFrom || "").toString().trim();
-  const body = (req.body.Body || "").toString().trim().toLowerCase();
+  const fromUser = (rawFrom || "").toString().trim(); // whatsapp:+977...
+  const bodyText = (req.body.Body || "").toString().trim().toLowerCase();
 
   console.log("twilioClient is", twilioClient ? "configured" : "null");
 
   try {
     let newState = null;
 
-    if (body === "open") newState = true;
-    else if (body === "close") newState = false;
+    if (bodyText === "open") newState = true;
+    else if (bodyText === "close") newState = false;
 
-    // Check if this is WhatsApp (works with sandbox)
-    const isWhatsapp = from.toLowerCase().includes("whatsapp");
+    const isWhatsapp = fromUser.toLowerCase().includes("whatsapp");
 
     if (newState === null) {
-      console.log("Unknown command from", from, "body:", body);
+      console.log("Unknown command from", fromUser, "body:", bodyText);
 
-      // Help reply
+      const helpMsg = "Send 'open' or 'close' to control the door.";
+
       if (twilioClient && isWhatsapp) {
         await twilioClient.messages.create({
-          from: WHATSAPP_NUMBER,
-          to: from,
-          body: "Send 'open' or 'close' to control the door.",
+          from: WHATSAPP_NUMBER,   // sandbox number
+          to: fromUser,            // user number
+          body: helpMsg,
         });
       }
 
-      // Structured JSON error response to Twilio
       return res.status(400).json({
         ok: false,
         error: "unknown_command",
-        message: "Send 'open' or 'close' to control the door.",
+        message: helpMsg,
         currentState: null,
       });
     }
@@ -115,26 +114,25 @@ app.post("/whatsapp/webhook", async (req, res) => {
         isOpen: newState,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
         source: isWhatsapp ? "whatsapp" : "web-ui",
-        from,
+        from: fromUser,
       },
       { merge: true }
     );
     console.log("Updated Firestore isOpen to", newState);
 
-    // Confirmation reply back to WhatsApp
     const stateMsg = newState
       ? "The door is now open."
       : "The door is now closed.";
 
+    // Send confirmation back to WhatsApp
     if (twilioClient && isWhatsapp) {
       await twilioClient.messages.create({
-        from: WHATSAPP_NUMBER,
-        to: from,
+        from: WHATSAPP_NUMBER,   // whatsapp:+14155238886
+        to: fromUser,            // whatsapp:+9779748212381
         body: stateMsg,
       });
     }
 
-    // Structured JSON success response to Twilio
     res.status(200).json({
       ok: true,
       isOpen: newState,
