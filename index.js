@@ -72,30 +72,64 @@ app.post("/whatsapp/webhook", async (req, res) => {
   console.log("Incoming body:", req.body);
 
   const rawFrom = req.body.From;
-  console.log("Raw From:", JSON.stringify(rawFrom));
-
-  const fromUser = (rawFrom || "").toString().trim(); // whatsapp:+977...
+  const fromUser = (rawFrom || "").toString().trim();
   const bodyText = (req.body.Body || "").toString().trim().toLowerCase();
 
+  console.log("Raw From:", JSON.stringify(rawFrom));
   console.log("twilioClient is", twilioClient ? "configured" : "null");
 
   try {
-    let newState = null;
-
-    if (bodyText === "open") newState = true;
-    else if (bodyText === "close") newState = false;
-
     const isWhatsapp = fromUser.toLowerCase().includes("whatsapp");
 
-    if (newState === null) {
-      console.log("Unknown command from", fromUser, "body:", bodyText);
+    // 1) STATUS COMMAND
+    if (bodyText === "status") {
+      const snap = await db.doc("doors/mainDoor").get();
 
-      const helpMsg = "Send 'open' or 'close' to control the door.";
+      let reply;
+      if (!snap.exists) {
+        reply = "I don't have any door activity yet.";
+      } else {
+        const data = snap.data();
+        const stateText = data.isOpen ? "open" : "closed";
+        const when = data.lastUpdated
+          ? data.lastUpdated.toDate().toLocaleString()
+          : "unknown time";
+        const who = data.from || "unknown user";
+
+        reply =
+          `Door is currently ${stateText}.\n` +
+          `Last changed at ${when} by ${who}.`;
+      }
 
       if (twilioClient && isWhatsapp) {
         await twilioClient.messages.create({
-          from: WHATSAPP_NUMBER,   // sandbox number
-          to: fromUser,            // user number
+          from: WHATSAPP_NUMBER,
+          to: fromUser,
+          body: reply,
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        command: "status",
+        message: "Status sent to WhatsApp.",
+      });
+    }
+
+    // 2) OPEN/CLOSE COMMANDS
+    let newState = null;
+    if (bodyText === "open") newState = true;
+    else if (bodyText === "close") newState = false;
+
+    if (newState === null) {
+      // 3) UNKNOWN COMMAND → HELP
+      const helpMsg =
+        "Send 'open' or 'close' to control the door, or 'status' to see the last activity.";
+
+      if (twilioClient && isWhatsapp) {
+        await twilioClient.messages.create({
+          from: WHATSAPP_NUMBER,
+          to: fromUser,
           body: helpMsg,
         });
       }
@@ -124,11 +158,10 @@ app.post("/whatsapp/webhook", async (req, res) => {
       ? "The door is now open."
       : "The door is now closed.";
 
-    // Send confirmation back to WhatsApp
     if (twilioClient && isWhatsapp) {
       await twilioClient.messages.create({
-        from: WHATSAPP_NUMBER,   // whatsapp:+14155238886
-        to: fromUser,            // whatsapp:+9779748212381
+        from: WHATSAPP_NUMBER,
+        to: fromUser,
         body: stateMsg,
       });
     }
