@@ -27,7 +27,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// ---------- Twilio (optional) ----------
+// ---------- Twilio ----------
 const accountSid = process.env.TWILIO_SID;
 const authToken = process.env.TWILIO_TOKEN;
 const WHATSAPP_NUMBER = process.env.WHATSAPP_NUMBER;
@@ -67,12 +67,17 @@ app.get("/door-state", async (req, res) => {
   }
 });
 
-// Twilio WhatsApp webhook
+// Twilio WhatsApp webhook - FIXED VERSION
 app.post("/whatsapp/webhook", async (req, res) => {
   console.log("Incoming body:", req.body);
 
-  const from = (req.body.From || "").toString().trim();
+  const rawFrom = req.body.From;
+  console.log("Raw From:", JSON.stringify(rawFrom));
+
+  const from = (rawFrom || "").toString().trim();
   const body = (req.body.Body || "").toString().trim().toLowerCase();
+
+  console.log("twilioClient is", twilioClient ? "configured" : "null");
 
   try {
     let newState = null;
@@ -80,48 +85,71 @@ app.post("/whatsapp/webhook", async (req, res) => {
     if (body === "open") newState = true;
     else if (body === "close") newState = false;
 
+    // Check if this is WhatsApp (works with sandbox)
+    const isWhatsapp = from.toLowerCase().includes("whatsapp");
+
     if (newState === null) {
       console.log("Unknown command from", from, "body:", body);
 
-      // Optional help reply
-      if (twilioClient && from.startsWith("whatsapp:")) {
+      // Help reply
+      if (twilioClient && isWhatsapp) {
         await twilioClient.messages.create({
           from: WHATSAPP_NUMBER,
           to: from,
           body: "Send 'open' or 'close' to control the door.",
         });
       }
-    } else {
-      await db.doc("doors/mainDoor").set(
-        {
-          isOpen: newState,
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-          source: from.startsWith("whatsapp:") ? "whatsapp" : "web-ui",
-          from,
-        },
-        { merge: true }
-      );
-      console.log("Updated Firestore isOpen to", newState);
 
-      // Confirmation reply back to WhatsApp only
-      if (twilioClient && from.startsWith("whatsapp:")) {
-        await twilioClient.messages.create({
-          from: WHATSAPP_NUMBER,
-          to: from,
-          body: newState
-            ? "The door is now open."
-            : "The door is now closed.",
-        });
-      }
+      // Structured JSON error response to Twilio
+      return res.status(400).json({
+        ok: false,
+        error: "unknown_command",
+        message: "Send 'open' or 'close' to control the door.",
+        currentState: null,
+      });
     }
 
-    res.status(200).send("ok");
+    // Update Firestore
+    await db.doc("doors/mainDoor").set(
+      {
+        isOpen: newState,
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        source: isWhatsapp ? "whatsapp" : "web-ui",
+        from,
+      },
+      { merge: true }
+    );
+    console.log("Updated Firestore isOpen to", newState);
+
+    // Confirmation reply back to WhatsApp
+    const stateMsg = newState
+      ? "The door is now open."
+      : "The door is now closed.";
+
+    if (twilioClient && isWhatsapp) {
+      await twilioClient.messages.create({
+        from: WHATSAPP_NUMBER,
+        to: from,
+        body: stateMsg,
+      });
+    }
+
+    // Structured JSON success response to Twilio
+    res.status(200).json({
+      ok: true,
+      isOpen: newState,
+      message: stateMsg,
+      currentState: newState,
+    });
   } catch (err) {
     console.error("Webhook error:", err);
-    res.status(500).send("error");
+    res.status(500).json({
+      ok: false,
+      error: "internal_error",
+      message: "Something went wrong, please try again.",
+    });
   }
 });
-
 
 // 404 for unknown API routes
 app.use((req, res) => {
