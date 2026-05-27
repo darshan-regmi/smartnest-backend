@@ -30,7 +30,7 @@ A Node.js backend server for IoT home automation, enabling remote door control t
 ```bash
 git clone https://github.com/darshan-regmi/smartnest-backend.git
 cd smartnest-backend
-npm install
+pnpm install
 ```
 
 Create a `.env` file in the project root:
@@ -48,7 +48,7 @@ PORT=3000
 ## Running the Server
 
 ```bash
-npm start
+pnpm start
 ```
 
 - The server listens on `PORT` (defaults to `3000` if not set).
